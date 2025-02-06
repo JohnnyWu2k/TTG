@@ -1,7 +1,7 @@
 # main.py
 import curses
-from server import start_server, PORT
-from client import run_client
+from network.server import start_server, PORT
+from network.client import run_client
 
 def main_menu(stdscr):
     curses.curs_set(0)
@@ -35,7 +35,6 @@ def main(stdscr):
         return
     server_host = "127.0.0.1"
     if mode == "host":
-        # Start the server in the background.
         start_server()
         server_host = "127.0.0.1"
     elif mode == "join":
