@@ -1,24 +1,31 @@
 # main.py
 import curses
+import time
 from network.server import start_server, PORT
 from network.client import run_client
 
 def main_menu(stdscr):
     curses.curs_set(0)
     stdscr.clear()
-    stdscr.addstr(2, 2, "Welcome to Multiplayer Text RPG")
-    stdscr.addstr(4, 2, "Press H to Host a game")
-    stdscr.addstr(5, 2, "Press J to Join a game")
-    stdscr.addstr(6, 2, "Press Q to Quit")
-    stdscr.refresh()
+    options = ["Host a game", "Join a game", "Quit"]
+    current_selection = 0
+
     while True:
+        stdscr.clear()
+        stdscr.addstr(1, 2, "Welcome to Multiplayer Text RPG", curses.A_BOLD)
+        for idx, option in enumerate(options):
+            if idx == current_selection:
+                stdscr.addstr(3 + idx, 4, "--> " + option, curses.A_REVERSE)
+            else:
+                stdscr.addstr(3 + idx, 4, "    " + option)
+        stdscr.refresh()
         key = stdscr.getch()
-        if key in [ord('h'), ord('H')]:
-            return "host"
-        elif key in [ord('j'), ord('J')]:
-            return "join"
-        elif key in [ord('q'), ord('Q')]:
-            return "quit"
+        if key == curses.KEY_UP and current_selection > 0:
+            current_selection -= 1
+        elif key == curses.KEY_DOWN and current_selection < len(options) - 1:
+            current_selection += 1
+        elif key in [curses.KEY_ENTER, 10, 13]:
+            return options[current_selection].split()[0].lower()
 
 def get_server_ip(stdscr):
     stdscr.clear()
@@ -29,17 +36,41 @@ def get_server_ip(stdscr):
     curses.noecho()
     return ip.decode('utf-8')
 
+def show_progress_bar(stdscr, message="Generating Map...", duration=3):
+    stdscr.clear()
+    max_y, max_x = stdscr.getmaxyx()
+    stdscr.addstr(max_y // 2 - 2, (max_x - len(message)) // 2, message)
+    bar_width = max_x - 20
+    for i in range(101):
+        progress = i / 100.0
+        filled = int(bar_width * progress)
+        bar = "[" + "#" * filled + "-" * (bar_width - filled) + "]"
+        stdscr.addstr(max_y // 2, 10, bar)
+        percent_text = f"{i}%"
+        stdscr.addstr(max_y // 2 + 1, (max_x - len(percent_text)) // 2, percent_text)
+        stdscr.refresh()
+        time.sleep(duration / 100.0)
+    time.sleep(0.5)
+
 def main(stdscr):
-    mode = main_menu(stdscr)
-    if mode == "quit":
-        return
-    server_host = "127.0.0.1"
-    if mode == "host":
-        start_server()
+    while True:
+        mode = main_menu(stdscr)
+        if mode == "quit":
+            break
         server_host = "127.0.0.1"
-    elif mode == "join":
-        server_host = get_server_ip(stdscr)
-    run_client(stdscr, server_host, PORT)
+        if mode == "host":
+            max_y, max_x = stdscr.getmaxyx()
+            start_server(max_x, max_y)
+            server_host = "127.0.0.1"
+            show_progress_bar(stdscr, message="Generating Map...", duration=3)
+        elif mode == "join":
+            server_host = get_server_ip(stdscr)
+        result = run_client(stdscr, server_host, PORT)
+        # If the client returns "quit_to_menu", loop back to the main menu.
+        if result == "quit_to_menu":
+            continue
+        else:
+            break
 
 if __name__ == "__main__":
     curses.wrapper(main)
