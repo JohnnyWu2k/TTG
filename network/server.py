@@ -4,15 +4,16 @@ import threading
 import json
 import time
 import random
-from game.map import GameMap
+from game.map import InfiniteGameMap
 from game.enemy import spawn_enemies, spawn_objects
 
 HOST = '0.0.0.0'
 PORT = 12345
 
-players = {}   # {client_id: {...}}
-enemies = {}   # {enemy_id: {...}}
-objects = {}   # {object_id: {...}}
+players = {}     # {client_id: {"x": int, "y": int, "char": str, "hp": int}}
+enemies = {}     # {enemy_id: {...}}
+objects = {}     # {object_id: {...}}
+custom_tiles = {}  # {(x,y): {"x": x, "y": y, "block": str, "char": str}}
 connections = []  # List of connected client sockets
 state_lock = threading.Lock()
 
@@ -25,6 +26,7 @@ def broadcast_state():
             "players": players,
             "enemies": enemies,
             "objects": objects,
+            "custom_tiles": custom_tiles,
             "map_seed": map_seed
         }) + "\n"
         for conn in connections.copy():
@@ -53,7 +55,23 @@ def handle_client(conn, addr):
                 line, buffer = buffer.split("\n", 1)
                 try:
                     message = json.loads(line)
-                    if message.get("attack", False):
+                    if message.get("build", False):
+                        # Build command: x, y, and block type.
+                        x = message.get("x", 0)
+                        y = message.get("y", 0)
+                        block = message.get("block", "")
+                        # Check that the target cell is walkable (terrain) and not occupied.
+                        can_build = True
+                        if not world_map.is_walkable(x, y):
+                            can_build = False
+                        for p in players.values():
+                            if p["x"] == x and p["y"] == y:
+                                can_build = False
+                                break
+                        if can_build:
+                            # Save or update the custom tile.
+                            custom_tiles[(x, y)] = {"x": x, "y": y, "block": block, "char": block}
+                    elif message.get("attack", False):
                         dx = message.get("dx", 0)
                         dy = message.get("dy", 0)
                         damage = message.get("damage", 1)
@@ -112,7 +130,7 @@ def handle_client(conn, addr):
 
 def server_main(world_width, world_height):
     global world_map, enemies, objects
-    world_map = GameMap(world_width, world_height, open_world=True, seed=map_seed)
+    world_map = InfiniteGameMap(world_width, chunk_height=20, seed=map_seed)
     enemies = spawn_enemies(world_width, world_height, seed=map_seed)
     objects = spawn_objects(world_width, world_height, seed=map_seed, game_map=world_map)
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

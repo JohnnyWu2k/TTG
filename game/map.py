@@ -2,96 +2,79 @@
 import random
 import curses
 
-class GameMap:
-    def __init__(self, width, height, open_world=True, seed=None):
+class InfiniteGameMap:
+    def __init__(self, width, chunk_height=20, seed=None):
         """
-        Initialize the map.
-          - width, height: dimensions of the map.
-          - open_world: if True, generate an open-world map.
-          - seed: an optional seed for deterministic generation.
+        width: fixed horizontal width in tiles.
+        chunk_height: number of rows per vertical chunk.
+        seed: global seed for procedural generation.
         """
         self.width = width
-        self.height = height
-        if seed is not None:
-            random.seed(seed)
-        if open_world:
-            self.tiles = self.generate_open_world()
-        else:
-            self.tiles = [['.' for _ in range(width)] for _ in range(height)]
-            self.create_walls()
+        self.chunk_height = chunk_height
+        self.seed = seed if seed is not None else random.randint(0, 1000000)
+        self.chunks = {}  # Dictionary: chunk_index -> 2D list of tiles
 
-    def create_walls(self):
-        """Create a simple border around the map."""
-        for x in range(self.width):
-            self.tiles[0][x] = '#'
-            self.tiles[self.height - 1][x] = '#'
-        for y in range(self.height):
-            self.tiles[y][0] = '#'
-            self.tiles[y][self.width - 1] = '#'
+    def generate_chunk(self, chunk_index):
+        local_seed = self.seed + chunk_index
+        rng = random.Random(local_seed)
+        chunk = []
+        for row in range(self.chunk_height):
+            row_data = []
+            for x in range(self.width):
+                if x == 0 or x == self.width - 1:
+                    row_data.append('#')
+                else:
+                    if rng.random() < 0.1:
+                        row_data.append('#')
+                    else:
+                        row_data.append('.')
+            # Ensure center is open.
+            center = self.width // 2
+            row_data[center] = '.'
+            chunk.append(row_data)
+        self.chunks[chunk_index] = chunk
+        return chunk
 
-    def generate_open_world(self):
-        """
-        Generate an open-world map:
-         - Mostly open floor ('.') with scattered obstacles ('#').
-         - Border walls are always present.
-         - A flood fill from (1,1) is used to improve connectivity.
-        """
-        # Initialize grid with floor.
-        grid = [['.' for _ in range(self.width)] for _ in range(self.height)]
-        # Create border walls.
-        for x in range(self.width):
-            grid[0][x] = '#'
-            grid[self.height - 1][x] = '#'
-        for y in range(self.height):
-            grid[y][0] = '#'
-            grid[y][self.width - 1] = '#'
-        
-        # Place obstacles randomly in the interior.
-        obstacle_probability = 0.1  # 10% chance
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                if random.random() < obstacle_probability:
-                    grid[y][x] = '#'
-        
-        # Flood fill from the starting cell (1,1).
-        reachable = set()
-        stack = [(1, 1)]
-        while stack:
-            cx, cy = stack.pop()
-            if (cx, cy) in reachable:
-                continue
-            reachable.add((cx, cy))
-            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-                nx, ny = cx + dx, cy + dy
-                if 0 <= nx < self.width and 0 <= ny < self.height and grid[ny][nx] == '.':
-                    stack.append((nx, ny))
-        
-        # Remove obstacles adjacent to reachable cells to improve connectivity.
-        for y in range(1, self.height - 1):
-            for x in range(1, self.width - 1):
-                if grid[y][x] == '#':
-                    for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-                        if (x + dx, y + dy) in reachable:
-                            grid[y][x] = '.'
-                            break
-        return grid
+    def get_chunk(self, chunk_index):
+        if chunk_index not in self.chunks:
+            return self.generate_chunk(chunk_index)
+        return self.chunks[chunk_index]
+
+    def get_tile(self, x, y):
+        if x < 0 or x >= self.width or y < 0:
+            return ' '  # Out-of-bounds
+        chunk_index = y // self.chunk_height
+        local_y = y % self.chunk_height
+        chunk = self.get_chunk(chunk_index)
+        return chunk[local_y][x]
 
     def is_walkable(self, x, y):
-        """Return True if tile (x, y) is floor ('.')."""
-        if 0 <= x < self.width and 0 <= y < self.height:
-            return self.tiles[y][x] == '.'
-        return False
+        return self.get_tile(x, y) == '.'
 
-    def draw(self, stdscr):
-        """Draw the map on the provided curses window."""
+    def draw_scaled(self, stdscr, scale=1, camera_x=0, camera_y=0, width_limit=None):
+        """
+        Draw the visible portion of the infinite map onto the screen.
+          - scale: each tile is drawn as a square of size (scale x scale) characters.
+          - camera_x, camera_y: global coordinates of the top-left tile visible.
+          - width_limit: optional maximum horizontal pixel width to draw (if provided, only draw columns
+            such that (col * scale) is less than width_limit).
+        """
         max_y, max_x = stdscr.getmaxyx()
-        for y, row in enumerate(self.tiles):
-            if y >= max_y:
-                break
-            for x, tile in enumerate(row):
-                if x >= max_x:
-                    break
-                try:
-                    stdscr.addch(y, x, tile)
-                except curses.error:
-                    pass
+        # If width_limit is provided, use it; otherwise, use full width (self.width).
+        if width_limit is None:
+            visible_cols = self.width
+        else:
+            visible_cols = min(self.width, width_limit // scale)
+        visible_rows = max_y // scale  # vertical number of tiles to draw
+
+        for gy in range(camera_y, camera_y + visible_rows):
+            for gx in range(camera_x, camera_x + visible_cols):
+                tile = self.get_tile(gx, gy)
+                screen_y = (gy - camera_y) * scale
+                screen_x = (gx - camera_x) * scale
+                for dy in range(scale):
+                    for dx in range(scale):
+                        try:
+                            stdscr.addch(screen_y + dy, screen_x + dx, tile)
+                        except curses.error:
+                            pass
