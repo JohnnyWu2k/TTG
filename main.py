@@ -4,15 +4,6 @@ import time
 from network.server import start_server, PORT
 from network.client import run_client
 
-def init_curses(stdscr):
-    curses.start_color()
-    curses.use_default_colors()
-    # Define color pair 1: yellow on default background.
-    curses.init_pair(1, curses.COLOR_YELLOW, -1)
-    curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
-    # Optionally set mouse interval to 0.
-    curses.mouseinterval(0)
-
 def main_menu(stdscr):
     curses.curs_set(0)
     stdscr.clear()

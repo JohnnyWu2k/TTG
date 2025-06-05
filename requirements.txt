@@ -1,3 +1,2 @@
 windows_curses
 pygame
-prompt_toolkit
