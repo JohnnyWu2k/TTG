@@ -38,6 +38,11 @@ class Game:
         self.stdscr = stdscr
         self.sock = sock
         curses.curs_set(0)
+        curses.start_color()
+        curses.use_default_colors()
+        curses.init_pair(1, curses.COLOR_YELLOW, -1)
+        curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
+        curses.mouseinterval(0)
         self.stdscr.nodelay(True)
         self.stdscr.timeout(50)
         self.game_map = None
@@ -378,6 +383,11 @@ class Game:
                     damage = 0
                 self.stdscr = curses.initscr()
                 curses.curs_set(0)
+                curses.start_color()
+                curses.use_default_colors()
+                curses.init_pair(1, curses.COLOR_YELLOW, -1)
+                curses.mousemask(curses.ALL_MOUSE_EVENTS | curses.REPORT_MOUSE_POSITION)
+                curses.mouseinterval(0)
                 self.stdscr.nodelay(True)
                 self.stdscr.timeout(50)
                 attack_command = {"attack": True,

@@ -62,6 +62,7 @@ def show_progress_bar(stdscr, message="Generating Map...", duration=3):
     time.sleep(0.5)
 
 def main(stdscr):
+    init_curses(stdscr)
     while True:
         mode = main_menu(stdscr)
         if mode == "quit":
