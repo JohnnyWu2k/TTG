@@ -78,3 +78,29 @@ class InfiniteGameMap:
                             stdscr.addch(screen_y + dy, screen_x + dx, tile)
                         except curses.error:
                             pass
+
+    def draw_pygame(self, surface, tile_size=32, camera_x=0, camera_y=0):
+        """Draw the map onto a Pygame surface as colored squares."""
+        import pygame
+
+        width_pixels, height_pixels = surface.get_width(), surface.get_height()
+        visible_cols = min(self.width, width_pixels // tile_size)
+        visible_rows = height_pixels // tile_size
+
+        colors = {
+            '.': (50, 50, 50),
+            '#': (100, 100, 100),
+            ' ': (0, 0, 0),
+        }
+
+        for gy in range(camera_y, camera_y + visible_rows):
+            for gx in range(camera_x, camera_x + visible_cols):
+                tile = self.get_tile(gx, gy)
+                color = colors.get(tile, (200, 200, 200))
+                rect = pygame.Rect(
+                    (gx - camera_x) * tile_size,
+                    (gy - camera_y) * tile_size,
+                    tile_size,
+                    tile_size,
+                )
+                pygame.draw.rect(surface, color, rect)
