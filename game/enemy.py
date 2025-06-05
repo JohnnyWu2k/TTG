@@ -36,7 +36,7 @@ def spawn_objects(world_width, world_height, seed=None, game_map=None):
             reachable.add((cx, cy))
             for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
                 nx, ny = cx + dx, cy + dy
-                if 0 <= nx < world_width and 0 <= ny < world_height and game_map.tiles[ny][nx] == '.':
+                if 0 <= nx < world_width and 0 <= ny < world_height and game_map.get_tile(nx, ny) == '.':
                     stack.append((nx, ny))
     # Loop over interior cells.
     for y in range(1, world_height - 1):

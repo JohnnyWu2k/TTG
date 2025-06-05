@@ -1,2 +1,3 @@
 windows_curses
 pygame
+blessed
